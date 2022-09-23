@@ -1,0 +1,52 @@
+from astropy.io import fits
+from astroquery.mast import Observations
+from builtins import input
+import numpy as np
+import matplotlib.pyplot as plt
+from matplotlib.colors import LogNorm
+from astropy.visualization import astropy_mpl_style
+plt.style.use(astropy_mpl_style)
+
+# Input object to snag
+objectInput = input("Please enter the object to snag data for: ")
+obsByName = Observations.query_object(objectInput)
+print("Number of results from all missions:",len(obsByName))
+print(obsByName[:10])
+
+# JWST ONLY
+mission = 'JWST'
+filtered = obsByName[(obsByName['obs_collection'] == mission)]
+print("\n\n JWST results only \n")
+print(filtered)
+print(filtered['obsid', 'instrument_name', 'filters', 'obs_id', 't_min'])
+
+# obsid load
+obsid = input("Please enter the obsid of interest: ")
+obs_data = filtered[(filtered['obsid'] == obsid)]
+print("\n Observation " + obsid + " of " + objectInput) 
+print(obs_data)
+
+# Data product load
+dataProducts = Observations.get_product_list(obs_data)
+print(dataProducts)
+
+# Filter data by calib
+calibrated = dataProducts[(dataProducts['calib_level'] >= 3)]
+print("Found ", len(calibrated), " data products with calibration level >= 3: \n")
+
+# download all i2d
+i2d = calibrated[(calibrated["productSubGroupDescription"] == "I2D")]
+manifest = Observations.download_products(i2d,mrp_only=True)
+
+downloadedData = fits.open(manifest['Local Path'][0])
+
+data = downloadedData[1].data
+# As expected, the data is a 2D numpy array
+print('data shape: ', np.shape(data))
+
+# Let's plot it as an image and see what we get:
+plt.figure()
+plt.imshow(data, cmap='grayscale',interpolation='nearest',
+               vmin=0, vmax=50)
+plt.colorbar()
+plt.show()
